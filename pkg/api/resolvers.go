@@ -28,8 +28,7 @@ func (r *Resolver) Query() QueryResolver       { return &queryResolver{r} }
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 
 func (r *queryResolver) HTTPRequestLogs(ctx context.Context) ([]HTTPRequestLog, error) {
-	opts := reqlog.FindRequestsOptions{OmitOutOfScope: false}
-	reqs, err := r.RequestLogService.FindRequests(ctx, opts)
+	reqs, err := r.RequestLogService.FindRequests(ctx)
 	if err == proj.ErrNoProject {
 		return nil, &gqlerror.Error{
 			Path:    graphql.GetPath(ctx),
@@ -249,6 +248,26 @@ func (r *mutationResolver) SetScope(ctx context.Context, input []ScopeRuleInput)
 	return scopeToScopeRules(rules), nil
 }
 
+func (r *queryResolver) HTTPRequestLogFilter(ctx context.Context) (*HTTPRequestLogFilter, error) {
+	return findReqFilterToHTTPReqLogFilter(r.RequestLogService.FindReqsFilter), nil
+}
+
+func (r *mutationResolver) SetHTTPRequestLogFilter(
+	ctx context.Context,
+	input *HTTPRequestLogFilterInput,
+) (*HTTPRequestLogFilter, error) {
+	filter := findRequestsFilterFromInput(input)
+	if err := r.RequestLogService.SetRequestLogFilter(ctx, filter); err != nil {
+		return nil, fmt.Errorf("could not set request log filter: %v", err)
+	}
+
+	empty := reqlog.FindRequestsFilter{}
+	if filter == empty {
+		return nil, nil
+	}
+	return findReqFilterToHTTPReqLogFilter(filter), nil
+}
+
 func stringPtrToRegexp(s *string) (*regexp.Regexp, error) {
 	if s == nil {
 		return nil, nil
@@ -269,4 +288,27 @@ func scopeToScopeRules(rules []scope.Rule) []ScopeRule {
 		scopeRules[i].Body = regexpToStringPtr(rule.Body)
 	}
 	return scopeRules
+}
+
+func findRequestsFilterFromInput(input *HTTPRequestLogFilterInput) (filter reqlog.FindRequestsFilter) {
+	if input == nil {
+		return
+	}
+	if input.OnlyInScope != nil {
+		filter.OnlyInScope = *input.OnlyInScope
+	}
+
+	return
+}
+
+func findReqFilterToHTTPReqLogFilter(findReqFilter reqlog.FindRequestsFilter) *HTTPRequestLogFilter {
+	empty := reqlog.FindRequestsFilter{}
+	if findReqFilter == empty {
+		return nil
+	}
+	httpReqLogFilter := &HTTPRequestLogFilter{
+		OnlyInScope: findReqFilter.OnlyInScope,
+	}
+
+	return httpReqLogFilter
 }

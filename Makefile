@@ -1,6 +1,23 @@
 PACKAGE_NAME := github.com/dstotijn/hetty
 GOLANG_CROSS_VERSION ?= v1.15.2
 
+ifeq ($(OS),Windows_NT)
+EXE=extension.exe
+LIB_EXT=dll
+RM=cmd /c del
+LDFLAG=
+else
+EXE=extension
+ifeq ($(shell uname -s),Darwin)
+LIB_EXT=dylib
+else
+LIB_EXT=so
+endif
+RM=rm -f
+LDFLAG=-fPIC
+endif
+LIB=sqlite3_mod_regexp.$(LIB_EXT)
+
 setup:
 	go mod download
 	go generate ./...
@@ -11,7 +28,10 @@ embed:
 	cd cmd/hetty && rice embed-go
 .PHONY: embed
 
-build: embed
+$(LIB): sqlite3_mod_regexp.c
+	gcc $(LDFLAG) -shared -o $@ $< -lsqlite3 -lpcre
+
+build: embed $(LIB)
 	env CGO_ENABLED=1 go build ./cmd/hetty
 .PHONY: build
 

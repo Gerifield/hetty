@@ -33,6 +33,14 @@ type HTTPRequestLog struct {
 	Response  *HTTPResponseLog `json:"response"`
 }
 
+type HTTPRequestLogFilter struct {
+	OnlyInScope bool `json:"onlyInScope"`
+}
+
+type HTTPRequestLogFilterInput struct {
+	OnlyInScope *bool `json:"onlyInScope"`
+}
+
 type HTTPResponseLog struct {
 	RequestID    int64        `json:"requestId"`
 	Proto        string       `json:"proto"`

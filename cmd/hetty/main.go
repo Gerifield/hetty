@@ -74,8 +74,9 @@ func main() {
 	scope := scope.New(db, projService)
 
 	reqLogService := reqlog.NewService(reqlog.Config{
-		Scope:      scope,
-		Repository: db,
+		Scope:          scope,
+		ProjectService: projService,
+		Repository:     db,
 	})
 
 	p, err := proxy.NewProxy(caCert, caKey)

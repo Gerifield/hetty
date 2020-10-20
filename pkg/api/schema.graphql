@@ -58,9 +58,18 @@ type DeleteProjectResult {
   success: Boolean!
 }
 
+input HttpRequestLogFilterInput {
+  onlyInScope: Boolean
+}
+
+type HttpRequestLogFilter {
+  onlyInScope: Boolean!
+}
+
 type Query {
   httpRequestLog(id: ID!): HttpRequestLog
   httpRequestLogs: [HttpRequestLog!]!
+  httpRequestLogFilter: HttpRequestLogFilter
   activeProject: Project
   projects: [Project!]!
   scope: [ScopeRule!]!
@@ -71,6 +80,9 @@ type Mutation {
   closeProject: CloseProjectResult!
   deleteProject(name: String!): DeleteProjectResult!
   setScope(scope: [ScopeRuleInput!]!): [ScopeRule!]!
+  setHttpRequestLogFilter(
+    filter: HttpRequestLogFilterInput
+  ): HttpRequestLogFilter
 }
 
 enum HttpMethod {

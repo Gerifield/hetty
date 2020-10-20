@@ -67,6 +67,10 @@ type ComplexityRoot struct {
 		URL       func(childComplexity int) int
 	}
 
+	HTTPRequestLogFilter struct {
+		OnlyInScope func(childComplexity int) int
+	}
+
 	HTTPResponseLog struct {
 		Body         func(childComplexity int) int
 		Headers      func(childComplexity int) int
@@ -77,10 +81,11 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		CloseProject  func(childComplexity int) int
-		DeleteProject func(childComplexity int, name string) int
-		OpenProject   func(childComplexity int, name string) int
-		SetScope      func(childComplexity int, scope []ScopeRuleInput) int
+		CloseProject            func(childComplexity int) int
+		DeleteProject           func(childComplexity int, name string) int
+		OpenProject             func(childComplexity int, name string) int
+		SetHTTPRequestLogFilter func(childComplexity int, filter *HTTPRequestLogFilterInput) int
+		SetScope                func(childComplexity int, scope []ScopeRuleInput) int
 	}
 
 	Project struct {
@@ -89,11 +94,12 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		ActiveProject   func(childComplexity int) int
-		HTTPRequestLog  func(childComplexity int, id int64) int
-		HTTPRequestLogs func(childComplexity int) int
-		Projects        func(childComplexity int) int
-		Scope           func(childComplexity int) int
+		ActiveProject        func(childComplexity int) int
+		HTTPRequestLog       func(childComplexity int, id int64) int
+		HTTPRequestLogFilter func(childComplexity int) int
+		HTTPRequestLogs      func(childComplexity int) int
+		Projects             func(childComplexity int) int
+		Scope                func(childComplexity int) int
 	}
 
 	ScopeHeader struct {
@@ -113,10 +119,12 @@ type MutationResolver interface {
 	CloseProject(ctx context.Context) (*CloseProjectResult, error)
 	DeleteProject(ctx context.Context, name string) (*DeleteProjectResult, error)
 	SetScope(ctx context.Context, scope []ScopeRuleInput) ([]ScopeRule, error)
+	SetHTTPRequestLogFilter(ctx context.Context, filter *HTTPRequestLogFilterInput) (*HTTPRequestLogFilter, error)
 }
 type QueryResolver interface {
 	HTTPRequestLog(ctx context.Context, id int64) (*HTTPRequestLog, error)
 	HTTPRequestLogs(ctx context.Context) ([]HTTPRequestLog, error)
+	HTTPRequestLogFilter(ctx context.Context) (*HTTPRequestLogFilter, error)
 	ActiveProject(ctx context.Context) (*Project, error)
 	Projects(ctx context.Context) ([]Project, error)
 	Scope(ctx context.Context) ([]ScopeRule, error)
@@ -221,6 +229,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.HTTPRequestLog.URL(childComplexity), true
 
+	case "HttpRequestLogFilter.onlyInScope":
+		if e.complexity.HTTPRequestLogFilter.OnlyInScope == nil {
+			break
+		}
+
+		return e.complexity.HTTPRequestLogFilter.OnlyInScope(childComplexity), true
+
 	case "HttpResponseLog.body":
 		if e.complexity.HTTPResponseLog.Body == nil {
 			break
@@ -294,6 +309,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.OpenProject(childComplexity, args["name"].(string)), true
 
+	case "Mutation.setHttpRequestLogFilter":
+		if e.complexity.Mutation.SetHTTPRequestLogFilter == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_setHttpRequestLogFilter_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.SetHTTPRequestLogFilter(childComplexity, args["filter"].(*HTTPRequestLogFilterInput)), true
+
 	case "Mutation.setScope":
 		if e.complexity.Mutation.SetScope == nil {
 			break
@@ -338,6 +365,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.HTTPRequestLog(childComplexity, args["id"].(int64)), true
+
+	case "Query.httpRequestLogFilter":
+		if e.complexity.Query.HTTPRequestLogFilter == nil {
+			break
+		}
+
+		return e.complexity.Query.HTTPRequestLogFilter(childComplexity), true
 
 	case "Query.httpRequestLogs":
 		if e.complexity.Query.HTTPRequestLogs == nil {
@@ -519,9 +553,18 @@ type DeleteProjectResult {
   success: Boolean!
 }
 
+input HttpRequestLogFilterInput {
+  onlyInScope: Boolean
+}
+
+type HttpRequestLogFilter {
+  onlyInScope: Boolean!
+}
+
 type Query {
   httpRequestLog(id: ID!): HttpRequestLog
   httpRequestLogs: [HttpRequestLog!]!
+  httpRequestLogFilter: HttpRequestLogFilter
   activeProject: Project
   projects: [Project!]!
   scope: [ScopeRule!]!
@@ -532,6 +575,9 @@ type Mutation {
   closeProject: CloseProjectResult!
   deleteProject(name: String!): DeleteProjectResult!
   setScope(scope: [ScopeRuleInput!]!): [ScopeRule!]!
+  setHttpRequestLogFilter(
+    filter: HttpRequestLogFilterInput
+  ): HttpRequestLogFilter
 }
 
 enum HttpMethod {
@@ -583,6 +629,21 @@ func (ec *executionContext) field_Mutation_openProject_args(ctx context.Context,
 		}
 	}
 	args["name"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_setHttpRequestLogFilter_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *HTTPRequestLogFilterInput
+	if tmp, ok := rawArgs["filter"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("filter"))
+		arg0, err = ec.unmarshalOHttpRequestLogFilterInput2ᚖgithubᚗcomᚋdstotijnᚋhettyᚋpkgᚋapiᚐHTTPRequestLogFilterInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["filter"] = arg0
 	return args, nil
 }
 
@@ -1083,6 +1144,41 @@ func (ec *executionContext) _HttpRequestLog_response(ctx context.Context, field 
 	return ec.marshalOHttpResponseLog2ᚖgithubᚗcomᚋdstotijnᚋhettyᚋpkgᚋapiᚐHTTPResponseLog(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _HttpRequestLogFilter_onlyInScope(ctx context.Context, field graphql.CollectedField, obj *HTTPRequestLogFilter) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "HttpRequestLogFilter",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.OnlyInScope, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _HttpResponseLog_requestId(ctx context.Context, field graphql.CollectedField, obj *HTTPResponseLog) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -1448,6 +1544,45 @@ func (ec *executionContext) _Mutation_setScope(ctx context.Context, field graphq
 	return ec.marshalNScopeRule2ᚕgithubᚗcomᚋdstotijnᚋhettyᚋpkgᚋapiᚐScopeRuleᚄ(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Mutation_setHttpRequestLogFilter(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_setHttpRequestLogFilter_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().SetHTTPRequestLogFilter(rctx, args["filter"].(*HTTPRequestLogFilterInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*HTTPRequestLogFilter)
+	fc.Result = res
+	return ec.marshalOHttpRequestLogFilter2ᚖgithubᚗcomᚋdstotijnᚋhettyᚋpkgᚋapiᚐHTTPRequestLogFilter(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Project_name(ctx context.Context, field graphql.CollectedField, obj *Project) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -1590,6 +1725,38 @@ func (ec *executionContext) _Query_httpRequestLogs(ctx context.Context, field gr
 	res := resTmp.([]HTTPRequestLog)
 	fc.Result = res
 	return ec.marshalNHttpRequestLog2ᚕgithubᚗcomᚋdstotijnᚋhettyᚋpkgᚋapiᚐHTTPRequestLogᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_httpRequestLogFilter(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().HTTPRequestLogFilter(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*HTTPRequestLogFilter)
+	fc.Result = res
+	return ec.marshalOHttpRequestLogFilter2ᚖgithubᚗcomᚋdstotijnᚋhettyᚋpkgᚋapiᚐHTTPRequestLogFilter(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_activeProject(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -3012,6 +3179,26 @@ func (ec *executionContext) ___Type_ofType(ctx context.Context, field graphql.Co
 
 // region    **************************** input.gotpl *****************************
 
+func (ec *executionContext) unmarshalInputHttpRequestLogFilterInput(ctx context.Context, obj interface{}) (HTTPRequestLogFilterInput, error) {
+	var it HTTPRequestLogFilterInput
+	var asMap = obj.(map[string]interface{})
+
+	for k, v := range asMap {
+		switch k {
+		case "onlyInScope":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("onlyInScope"))
+			it.OnlyInScope, err = ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputScopeHeaderInput(ctx context.Context, obj interface{}) (ScopeHeaderInput, error) {
 	var it ScopeHeaderInput
 	var asMap = obj.(map[string]interface{})
@@ -3226,6 +3413,33 @@ func (ec *executionContext) _HttpRequestLog(ctx context.Context, sel ast.Selecti
 	return out
 }
 
+var httpRequestLogFilterImplementors = []string{"HttpRequestLogFilter"}
+
+func (ec *executionContext) _HttpRequestLogFilter(ctx context.Context, sel ast.SelectionSet, obj *HTTPRequestLogFilter) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, httpRequestLogFilterImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("HttpRequestLogFilter")
+		case "onlyInScope":
+			out.Values[i] = ec._HttpRequestLogFilter_onlyInScope(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var httpResponseLogImplementors = []string{"HttpResponseLog"}
 
 func (ec *executionContext) _HttpResponseLog(ctx context.Context, sel ast.SelectionSet, obj *HTTPResponseLog) graphql.Marshaler {
@@ -3307,6 +3521,8 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "setHttpRequestLogFilter":
+			out.Values[i] = ec._Mutation_setHttpRequestLogFilter(ctx, field)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -3388,6 +3604,17 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				if res == graphql.Null {
 					atomic.AddUint32(&invalids, 1)
 				}
+				return res
+			})
+		case "httpRequestLogFilter":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_httpRequestLogFilter(ctx, field)
 				return res
 			})
 		case "activeProject":
@@ -4304,6 +4531,21 @@ func (ec *executionContext) marshalOHttpRequestLog2ᚖgithubᚗcomᚋdstotijnᚋ
 		return graphql.Null
 	}
 	return ec._HttpRequestLog(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOHttpRequestLogFilter2ᚖgithubᚗcomᚋdstotijnᚋhettyᚋpkgᚋapiᚐHTTPRequestLogFilter(ctx context.Context, sel ast.SelectionSet, v *HTTPRequestLogFilter) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._HttpRequestLogFilter(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOHttpRequestLogFilterInput2ᚖgithubᚗcomᚋdstotijnᚋhettyᚋpkgᚋapiᚐHTTPRequestLogFilterInput(ctx context.Context, v interface{}) (*HTTPRequestLogFilterInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputHttpRequestLogFilterInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalOHttpResponseLog2ᚖgithubᚗcomᚋdstotijnᚋhettyᚋpkgᚋapiᚐHTTPResponseLog(ctx context.Context, sel ast.SelectionSet, v *HTTPResponseLog) graphql.Marshaler {

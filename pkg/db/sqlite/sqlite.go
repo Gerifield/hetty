@@ -22,8 +22,7 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
 
-	// Register sqlite3 for use via database/sql.
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/mattn/go-sqlite3"
 )
 
 // Client implements reqlog.Repository.
@@ -38,6 +37,15 @@ type httpRequestLogsQuery struct {
 	requestHeaderCols  []string
 	responseHeaderCols []string
 	joinResponse       bool
+}
+
+func init() {
+	sql.Register("sqlite3_with_extensions",
+		&sqlite3.SQLiteDriver{
+			Extensions: []string{
+				"sqlite3_mod_regexp",
+			},
+		})
 }
 
 func New(dbPath string) (*Client, error) {
@@ -62,7 +70,7 @@ func (c *Client) OpenProject(name string) error {
 
 	dbPath := filepath.Join(c.dbPath, name+".db")
 	dsn := fmt.Sprintf("file:%v?%v", dbPath, opts.Encode())
-	db, err := sqlx.Open("sqlite3", dsn)
+	db, err := sqlx.Open("sqlite3_with_extensions", dsn)
 	if err != nil {
 		return fmt.Errorf("sqlite: could not open database: %v", err)
 	}
@@ -194,7 +202,7 @@ var headerFieldToColumnMap = map[string]string{
 
 func (c *Client) FindRequestLogs(
 	ctx context.Context,
-	opts reqlog.FindRequestsOptions,
+	filter reqlog.FindRequestsFilter,
 	scope *scope.Scope,
 ) (reqLogs []reqlog.Request, err error) {
 	if c.db == nil {
@@ -211,12 +219,24 @@ func (c *Client) FindRequestLogs(
 		reqQuery = reqQuery.LeftJoin("http_responses res ON req.id = res.req_id")
 	}
 
-	sql, _, err := reqQuery.ToSql()
+	if filter.OnlyInScope && scope != nil {
+		var ruleExpr []sq.Sqlizer
+		for _, rule := range scope.Rules() {
+			if rule.URL != nil {
+				ruleExpr = append(ruleExpr, sq.Expr("req.url regexp ?", rule.URL.String()))
+			}
+		}
+		if len(ruleExpr) > 0 {
+			reqQuery = reqQuery.Where(sq.Or(ruleExpr))
+		}
+	}
+
+	sql, args, err := reqQuery.ToSql()
 	if err != nil {
 		return nil, fmt.Errorf("sqlite: could not parse query: %v", err)
 	}
 
-	rows, err := c.db.QueryxContext(ctx, sql, nil)
+	rows, err := c.db.QueryxContext(ctx, sql, args...)
 	if err != nil {
 		return nil, fmt.Errorf("sqlite: could not execute query: %v", err)
 	}
