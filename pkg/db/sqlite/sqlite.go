@@ -22,7 +22,11 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
 
-	"github.com/mattn/go-sqlite3"
+	// Register `sqlite3` driver.
+	_ "github.com/mattn/go-sqlite3"
+
+	// Register `regexp()` function.
+	_ "github.com/dstotijn/hetty/pkg/db/sqlite/regexp"
 )
 
 // Client implements reqlog.Repository.
@@ -37,15 +41,6 @@ type httpRequestLogsQuery struct {
 	requestHeaderCols  []string
 	responseHeaderCols []string
 	joinResponse       bool
-}
-
-func init() {
-	sql.Register("sqlite3_with_extensions",
-		&sqlite3.SQLiteDriver{
-			Extensions: []string{
-				"sqlite3_mod_regexp",
-			},
-		})
 }
 
 func New(dbPath string) (*Client, error) {
@@ -70,7 +65,7 @@ func (c *Client) OpenProject(name string) error {
 
 	dbPath := filepath.Join(c.dbPath, name+".db")
 	dsn := fmt.Sprintf("file:%v?%v", dbPath, opts.Encode())
-	db, err := sqlx.Open("sqlite3_with_extensions", dsn)
+	db, err := sqlx.Open("sqlite3", dsn)
 	if err != nil {
 		return fmt.Errorf("sqlite: could not open database: %v", err)
 	}

@@ -15,6 +15,7 @@ builds:
     env:
       - CC=o64-clang
       - CXX=o64-clang++
+      - CGO_LDFLAGS=-Wl,-undefined,dynamic_lookup
     flags:
       - -mod=readonly
     ldflags:
@@ -24,6 +25,8 @@ builds:
       - amd64
     goos:
       - linux
+    env:
+      - CGO_LDFLAGS=-Wl,--unresolved-symbols=ignore-in-object-files
     flags:
       - -mod=readonly
     ldflags:
